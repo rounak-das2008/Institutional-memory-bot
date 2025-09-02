@@ -27,6 +27,18 @@ SIMILARITY_THRESHOLD = 0.5
 EMBEDDING_MODEL = "gemini-2.5-flash"
 GENERATION_MODEL = "gemini-2.5-flash"
 
+# GitHub Integration Configuration
+GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
+GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "")
+AUTO_UPDATE_INTERVAL = int(os.getenv("AUTO_UPDATE_INTERVAL", "3600"))  # seconds
+
+# Database Configuration
+CHAT_DB_PATH = Path("chat_sessions.db")
+
+# Session Configuration
+MAX_CHAT_HISTORY = 50
+MAX_SESSIONS_PER_USER = 20
+
 # System Prompt Template
 SYSTEM_PROMPT = """You are an institutional memory assistant that helps users find information from technical documentation.
 

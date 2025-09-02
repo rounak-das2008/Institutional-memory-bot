@@ -6,8 +6,12 @@ requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.13.5",
     "chromadb>=1.0.20",
+    "gitpython>=3.1.45",
     "google-genai>=1.32.0",
     "markdown>=3.8.2",
+    "requests>=2.32.5",
+    "schedule>=1.2.2",
     "sift-stack-py>=0.8.5",
     "streamlit>=1.49.1",
+    "trafilatura>=2.0.0",
 ]

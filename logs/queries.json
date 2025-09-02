@@ -1,0 +1,15 @@
+[
+  {
+    "timestamp": "2025-09-02T15:02:35.293386",
+    "query": "Could you tell how to restart JBoss ",
+    "retrieved_chunks": [
+      {
+        "content": "Restarting JBoss - Example Runbook (v1) Steps V1: 1. SSH to gateway01 VM 2. Change user to test2 3. As test2 run /etc/standalone.sh Restarting JBoss - Updated (v2) Steps V2: 1. SSH to gateway02 VM 2. ...",
+        "source": "jboss_restart.md",
+        "similarity_score": 0.5299161672592163
+      }
+    ],
+    "response": "There are two versions for restarting JBoss based on the provided context:\n\n**Version 1 (Example Runbook):**\n1. SSH to gateway01 VM\n2. Change user to test2\n3. As test2 run `/etc/standalone.sh`\n\n**Version 2 (Updated):**\n1. SSH to gateway02 VM\n2. Change user to test3\n3. Clear `/home/test3/*.log` files\n4. Run `/etc/jbossas/standalone.sh`\n\nSource: jboss_restart.md",
+    "feedback": null
+  }
+]
