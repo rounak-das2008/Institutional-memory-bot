@@ -6,21 +6,21 @@ Reads documents from the data/ directory and builds a vector index.
 
 import sys
 from pathlib import Path
+from datetime import datetime
 from document_processor import document_processor
 from vector_store import vector_store
 from logger import query_logger
-from config import DATA_DIR, GITHUB_REPO_URL, GITHUB_TOKEN
-from github_crawler import initialize_github_crawler
-from chat_sessions import chat_session_manager
+from config import DATA_DIR, WIKI_BASE_URL, WIKI_API_KEY
+from wiki_crawler import initialize_wiki_crawler
 
 def main():
     """Main ingestion function"""
     import argparse
     parser = argparse.ArgumentParser(description='Ingest documents into the knowledge base')
-    parser.add_argument('--source', choices=['local', 'github'], default='auto', 
-                       help='Source of documents (local files or GitHub repo)')
-    parser.add_argument('--repo-url', type=str, help='GitHub repository URL')
-    parser.add_argument('--github-token', type=str, help='GitHub token for private repos')
+    parser.add_argument('--source', choices=['local', 'wiki'], default='auto', 
+                       help='Source of documents (local files or Wiki.js)')
+    parser.add_argument('--wiki-url', type=str, help='Wiki.js base URL')
+    parser.add_argument('--wiki-api-key', type=str, help='Wiki.js API key')
     args = parser.parse_args()
     
     print("Starting document ingestion...")
@@ -31,46 +31,43 @@ def main():
         
         # Auto-detect source type
         if source_type == 'auto':
-            repo_url = args.repo_url or GITHUB_REPO_URL
-            if repo_url:
-                source_type = 'github'
+            wiki_url = args.wiki_url or WIKI_BASE_URL
+            if wiki_url and wiki_url != 'http://localhost:3000':
+                source_type = 'wiki'
             elif DATA_DIR.exists() and any(DATA_DIR.iterdir()):
                 source_type = 'local'
             else:
-                print("No data source found. Please provide either local files or GitHub repo URL.")
+                print("No data source found. Please provide either local files or Wiki.js URL.")
                 sys.exit(1)
         
-        if source_type == 'github':
-            # GitHub ingestion
-            repo_url = args.repo_url or GITHUB_REPO_URL
-            github_token = args.github_token or GITHUB_TOKEN
+        if source_type == 'wiki':
+            # Wiki.js ingestion
+            wiki_url = args.wiki_url or WIKI_BASE_URL
+            wiki_api_key = args.wiki_api_key or WIKI_API_KEY
             
-            if not repo_url:
-                print("Error: GitHub repository URL is required")
-                print("Set GITHUB_REPO_URL environment variable or use --repo-url")
+            if not wiki_url:
+                print("Error: Wiki.js base URL is required")
+                print("Set WIKI_BASE_URL environment variable or use --wiki-url")
                 sys.exit(1)
             
-            print(f"Loading documents from GitHub repository: {repo_url}")
-            crawler = initialize_github_crawler(repo_url, github_token)
+            print(f"Loading documents from Wiki.js instance: {wiki_url}")
+            crawler = initialize_wiki_crawler(wiki_url, wiki_api_key)
             if not crawler:
-                print("Failed to initialize GitHub crawler")
+                print("Failed to initialize Wiki.js crawler")
                 sys.exit(1)
             
-            # Get repository info
-            repo_info = crawler.get_repo_info()
-            if repo_info:
-                print(f"Repository: {repo_info.get('full_name', 'Unknown')}")
-                print(f"Description: {repo_info.get('description', 'No description')}")
+            # Test connection
+            if not crawler.test_connection():
+                print(f"Warning: Cannot connect to Wiki.js at {wiki_url}")
+                print("Make sure your Wiki.js instance is running and accessible")
             
-            # Fetch documents from GitHub
+            # Fetch documents from Wiki.js
             documents = crawler.fetch_all_documents()
             
-            # Store latest commit info for update detection
-            latest_commit = crawler.get_latest_commit()
-            if latest_commit:
-                with open('.github_last_commit', 'w') as f:
-                    f.write(latest_commit['sha'])
-                print(f"Latest commit: {latest_commit['sha'][:8]}")
+            # Store fetch timestamp for change detection
+            with open('.wiki_last_fetch', 'w') as f:
+                f.write(datetime.now().isoformat())
+            print(f"Fetched at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
         
         else:
             # Local file ingestion

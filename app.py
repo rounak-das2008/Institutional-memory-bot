@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Streamlit web application for the Institutional Memory chatbot.
-Enhanced with chat history and GitHub integration.
+Enhanced with chat history and Wiki.js integration.
 """
 
 import streamlit as st
@@ -15,9 +15,8 @@ from vector_store import vector_store
 from gemini_client import gemini_client
 from logger import query_logger
 from chat_sessions import chat_session_manager
-from github_crawler import initialize_github_crawler
-from auto_updater import auto_updater
-from config import GEMINI_API_KEY, GITHUB_REPO_URL, GITHUB_TOKEN
+from wiki_crawler import initialize_wiki_crawler
+from config import GEMINI_API_KEY, WIKI_BASE_URL, WIKI_API_KEY
 
 # Page configuration
 st.set_page_config(
@@ -54,6 +53,21 @@ st.markdown("""
     border: 1px solid #e0e0e0;
     margin: 0.5rem 0;
 }
+.wiki-status {
+    padding: 0.5rem;
+    border-radius: 0.25rem;
+    margin: 0.25rem 0;
+}
+.wiki-connected {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+.wiki-disconnected {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -71,6 +85,17 @@ def check_system_status():
         issues.append("⚠️ No documents in knowledge base")
     
     return issues
+
+def check_wiki_connection():
+    """Check Wiki.js connection status"""
+    try:
+        if WIKI_BASE_URL:
+            crawler = initialize_wiki_crawler(WIKI_BASE_URL, WIKI_API_KEY)
+            if crawler and crawler.test_connection():
+                return True
+        return False
+    except:
+        return False
 
 def display_chat_history_sidebar():
     """Display chat history and session management in sidebar"""
@@ -100,7 +125,6 @@ def display_chat_history_sidebar():
                 
                 # Session container
                 session_key = f"session_{session['id']}"
-                is_active = session.get('is_active', False)
                 
                 # Use columns for session item and delete button
                 col1, col2 = st.columns([4, 1])
@@ -144,7 +168,26 @@ def display_system_info_sidebar():
         with col2:
             st.metric("Status", "✅" if info['count'] > 0 else "❌")
         
-        # GitHub configuration
+        # Wiki.js connection status
+        st.markdown("---")
+        st.header("📖 Wiki.js Integration")
+        
+        # Check Wiki.js connection
+        wiki_connected = check_wiki_connection()
+        
+        if wiki_connected:
+            st.markdown('<div class="wiki-status wiki-connected">🟢 Wiki.js Connected</div>', 
+                       unsafe_allow_html=True)
+            st.write(f"📍 {WIKI_BASE_URL}")
+        else:
+            st.markdown('<div class="wiki-status wiki-disconnected">🔴 Wiki.js Disconnected</div>', 
+                       unsafe_allow_html=True)
+            if WIKI_BASE_URL:
+                st.write(f"📍 {WIKI_BASE_URL}")
+            else:
+                st.write("📍 Not configured")
+        
+        # Data sources info
         st.markdown("---")
         st.header("📦 Data Sources")
         
@@ -153,15 +196,24 @@ def display_system_info_sidebar():
         local_files = len(list(data_dir.glob("*"))) if data_dir.exists() else 0
         st.write(f"📁 Local files: {local_files}")
         
-        # GitHub repo
-        if GITHUB_REPO_URL:
-            st.write(f"🔗 GitHub: {GITHUB_REPO_URL}")
+        # Wiki.js pages info
+        if wiki_connected:
+            # Check for last fetch timestamp
+            wiki_last_fetch = Path('.wiki_last_fetch')
+            if wiki_last_fetch.exists():
+                with open(wiki_last_fetch, 'r') as f:
+                    last_fetch = f.read().strip()
+                try:
+                    fetch_time = datetime.fromisoformat(last_fetch)
+                    st.write(f"📖 Last sync: {fetch_time.strftime('%m/%d %H:%M')}")
+                except:
+                    st.write("📖 Wiki.js: Available")
+            else:
+                st.write("📖 Wiki.js: Not synced yet")
             
-            # Check for updates button
-            if st.button("🔄 Check for Updates", help="Check GitHub repo for new changes"):
-                check_github_updates()
-        else:
-            st.write("🔗 GitHub: Not configured")
+            # Refresh Wiki button
+            if st.button("🔄 Sync Wiki Pages", help="Fetch latest pages from Wiki.js"):
+                sync_wiki_pages()
         
         # Configuration expander
         with st.expander("⚙️ Configuration"):
@@ -169,28 +221,34 @@ def display_system_info_sidebar():
 
 def display_configuration_panel():
     """Display configuration options"""
-    st.markdown("### GitHub Integration")
+    st.markdown("### Wiki.js Configuration")
     
-    # GitHub repo URL input
-    repo_url = st.text_input(
-        "Repository URL",
-        value=GITHUB_REPO_URL,
-        help="GitHub repository URL (e.g., https://github.com/user/repo)",
-        key="github_repo_input"
+    # Wiki.js URL input
+    wiki_url = st.text_input(
+        "Wiki.js Base URL",
+        value=WIKI_BASE_URL,
+        help="Wiki.js instance URL (e.g., http://localhost:3000)",
+        key="wiki_url_input"
     )
     
-    # GitHub token input
-    github_token = st.text_input(
-        "GitHub Token (Optional)",
-        value="***" if GITHUB_TOKEN else "",
+    # Wiki.js API key input
+    wiki_api_key = st.text_input(
+        "Wiki.js API Key (Optional)",
+        value="***" if WIKI_API_KEY else "",
         type="password",
-        help="For private repos or higher rate limits",
-        key="github_token_input"
+        help="For private wikis or API access",
+        key="wiki_api_key_input"
     )
     
-    # Save configuration button
-    if st.button("💾 Save GitHub Config", key="save_github_config"):
-        save_github_configuration(repo_url, github_token)
+    # Test connection button
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🔍 Test Connection", key="test_wiki_connection"):
+            test_wiki_connection(wiki_url, wiki_api_key)
+    
+    with col2:
+        if st.button("💾 Save Config", key="save_wiki_config"):
+            save_wiki_configuration(wiki_url, wiki_api_key)
     
     st.markdown("### Ingestion Actions")
     
@@ -200,8 +258,8 @@ def display_configuration_panel():
             trigger_ingestion("local")
     
     with col2:
-        if st.button("📦 Ingest GitHub Repo", key="ingest_github"):
-            trigger_ingestion("github")
+        if st.button("📖 Ingest Wiki Pages", key="ingest_wiki"):
+            trigger_ingestion("wiki")
     
     if st.button("🔄 Reset Vector Database", key="reset_db", help="Clear all ingested documents"):
         reset_vector_database()
@@ -288,13 +346,20 @@ def display_main_chat():
             if message["role"] == "assistant" and message.get("sources"):
                 with st.expander("📚 Sources", expanded=False):
                     for j, source in enumerate(message["sources"]):
+                        # Handle Wiki.js sources specially
+                        source_icon = "📖" if source.get('source', '').startswith('wiki:') else "📁"
+                        
                         st.markdown(f"""
-                        **{j+1}. {source.get('title', 'Unknown')}** (Score: {source.get('similarity_score', 0):.3f})
+                        **{source_icon} {j+1}. {source.get('title', 'Unknown')}** (Score: {source.get('similarity_score', 0):.3f})
                         - Source: `{source.get('source', 'Unknown')}`
                         - Chunk {source.get('chunk_id', 0)} (Rank {source.get('rank', 0)})
                         
                         *Preview:* {source.get('content', '')[:200]}...
                         """)
+                        
+                        # Add Wiki.js page link if available
+                        if 'wiki_url' in source:
+                            st.markdown(f"[🔗 View in Wiki.js]({source['wiki_url']})")
                 
                 # Feedback buttons
                 feedback_key = f"feedback_{i}_{st.session_state.current_session_id}"
@@ -341,13 +406,19 @@ def display_main_chat():
             if sources:
                 with st.expander("📚 Sources", expanded=False):
                     for i, source in enumerate(sources):
+                        source_icon = "📖" if source.get('source', '').startswith('wiki:') else "📁"
+                        
                         st.markdown(f"""
-                        **{i+1}. {source.get('title', 'Unknown')}** (Score: {source.get('similarity_score', 0):.3f})
+                        **{source_icon} {i+1}. {source.get('title', 'Unknown')}** (Score: {source.get('similarity_score', 0):.3f})
                         - Source: `{source.get('source', 'Unknown')}`
                         - Chunk {source.get('chunk_id', 0)} (Rank {source.get('rank', 0)})
                         
                         *Preview:* {source.get('content', '')[:200]}...
                         """)
+                        
+                        # Add Wiki.js page link if available
+                        if 'wiki_url' in source:
+                            st.markdown(f"[🔗 View in Wiki.js]({source['wiki_url']})")
         
         # Add assistant response to chat
         assistant_message = {
@@ -410,31 +481,42 @@ def update_session_title(first_question: str):
     """Update session title based on the first question"""
     # Create a meaningful title from the first question
     title = first_question[:50] + "..." if len(first_question) > 50 else first_question
-    
-    # This would require adding a method to update session title
     # For now, we'll leave the auto-generated title
 
-def check_github_updates():
-    """Check for GitHub repository updates"""
+def test_wiki_connection(wiki_url: str, api_key: str = None):
+    """Test Wiki.js connection"""
     try:
-        with st.spinner("Checking for updates..."):
-            if auto_updater.check_for_updates():
-                st.success("Updates found! Triggering automatic ingestion...")
-                success = auto_updater.trigger_ingestion()
-                if success:
-                    st.success("✅ Knowledge base updated successfully!")
-                else:
-                    st.error("❌ Failed to update knowledge base")
+        with st.spinner("Testing Wiki.js connection..."):
+            crawler = initialize_wiki_crawler(wiki_url, api_key)
+            if crawler and crawler.test_connection():
+                st.success(f"✅ Successfully connected to Wiki.js at {wiki_url}")
             else:
-                st.info("No updates found. Knowledge base is up to date.")
+                st.error(f"❌ Cannot connect to Wiki.js at {wiki_url}")
+                st.info("Make sure your Wiki.js instance is running and accessible")
     except Exception as e:
-        st.error(f"Error checking for updates: {str(e)}")
+        st.error(f"Error testing connection: {str(e)}")
 
-def save_github_configuration(repo_url: str, github_token: str):
-    """Save GitHub configuration"""
+def sync_wiki_pages():
+    """Sync pages from Wiki.js"""
+    try:
+        with st.spinner("Syncing Wiki.js pages..."):
+            result = subprocess.run([
+                'python', 'ingest.py', '--source', 'wiki'
+            ], capture_output=True, text=True, cwd=os.getcwd())
+            
+            if result.returncode == 0:
+                st.success("✅ Successfully synced Wiki.js pages!")
+                st.rerun()
+            else:
+                st.error(f"❌ Failed to sync pages: {result.stderr}")
+    except Exception as e:
+        st.error(f"Error syncing Wiki.js: {str(e)}")
+
+def save_wiki_configuration(wiki_url: str, api_key: str):
+    """Save Wiki.js configuration"""
     # In a real implementation, you'd save this to environment or config file
     st.success("Configuration saved! (Note: Restart the app to apply changes)")
-    st.info("Set GITHUB_REPO_URL and GITHUB_TOKEN environment variables for persistence")
+    st.info("Set WIKI_BASE_URL and WIKI_API_KEY environment variables for persistence")
 
 def trigger_ingestion(source_type: str):
     """Trigger document ingestion"""

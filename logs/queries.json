@@ -11,5 +11,18 @@
     ],
     "response": "There are two versions for restarting JBoss based on the provided context:\n\n**Version 1 (Example Runbook):**\n1. SSH to gateway01 VM\n2. Change user to test2\n3. As test2 run `/etc/standalone.sh`\n\n**Version 2 (Updated):**\n1. SSH to gateway02 VM\n2. Change user to test3\n3. Clear `/home/test3/*.log` files\n4. Run `/etc/jbossas/standalone.sh`\n\nSource: jboss_restart.md",
     "feedback": null
+  },
+  {
+    "timestamp": "2025-09-02T16:29:38.938964",
+    "query": "hey can you help me to start jboss ",
+    "retrieved_chunks": [
+      {
+        "content": "Restarting JBoss - Example Runbook (v1) Steps V1: 1. SSH to gateway01 VM 2. Change user to test2 3. As test2 run /etc/standalone.sh Restarting JBoss - Updated (v2) Steps V2: 1. SSH to gateway02 VM 2. ...",
+        "source": "jboss_restart.md",
+        "similarity_score": 0.37103307247161865
+      }
+    ],
+    "response": "Here are the steps to restart JBoss, including two available versions:\n\n**Restarting JBoss - Example Runbook (v1)**\n1.  SSH to `gateway01` VM.\n2.  Change user to `test2`.\n3.  As `test2`, run `/etc/standalone.sh`.\n\n*Source: jboss_restart.md*\n\n**Restarting JBoss - Updated (v2)**\n1.  SSH to `gateway02` VM.\n2.  Change user to `test3`.\n3.  Clear `/home/test3/*.log` files.\n4.  Run `/etc/jbossas/standalone.sh`.\n\n*Source: jboss_restart.md*",
+    "feedback": null
   }
 ]

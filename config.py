@@ -27,10 +27,10 @@ SIMILARITY_THRESHOLD = 0.5
 EMBEDDING_MODEL = "gemini-2.5-flash"
 GENERATION_MODEL = "gemini-2.5-flash"
 
-# GitHub Integration Configuration
-GITHUB_TOKEN = os.getenv("GITHUB_TOKEN", "")
-GITHUB_REPO_URL = os.getenv("GITHUB_REPO_URL", "")
-AUTO_UPDATE_INTERVAL = int(os.getenv("AUTO_UPDATE_INTERVAL", "3600"))  # seconds
+# Wiki.js Integration Configuration
+WIKI_BASE_URL = os.getenv("WIKI_BASE_URL", "http://localhost:3000")
+WIKI_API_KEY = os.getenv("WIKI_API_KEY", "")
+WIKI_REFRESH_INTERVAL = int(os.getenv("WIKI_REFRESH_INTERVAL", "1800"))  # seconds
 
 # Database Configuration
 CHAT_DB_PATH = Path("chat_sessions.db")
