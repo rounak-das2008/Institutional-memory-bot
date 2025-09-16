@@ -46,7 +46,7 @@ class WikiAutoRefresh:
     def should_refresh(self) -> bool:
         """Check if it's time to refresh Wiki.js content"""
         try:
-            if not WIKI_BASE_URL or WIKI_BASE_URL == 'http://localhost:3000':
+            if not WIKI_BASE_URL or WIKI_BASE_URL == 'http://localhost':
                 return False
             
             last_fetch = self.get_last_fetch_time()
@@ -139,7 +139,7 @@ class WikiAutoRefresh:
     
     def start_scheduler(self):
         """Start the Wiki.js auto-refresh scheduler"""
-        if not WIKI_BASE_URL or WIKI_BASE_URL == 'http://localhost:3000':
+        if not WIKI_BASE_URL or WIKI_BASE_URL == 'http://localhost':
             query_logger.logger.info("No Wiki.js URL configured or using default localhost, auto-refresh disabled")
             return
         

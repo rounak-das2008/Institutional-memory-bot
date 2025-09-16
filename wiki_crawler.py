@@ -14,7 +14,7 @@ class WikiJSCrawler:
         Initialize Wiki.js crawler
         
         Args:
-            base_url: Wiki.js base URL (e.g., http://localhost:3000)
+            base_url: Wiki.js base URL (e.g., http://localhost)
             api_key: Wiki.js API key (optional, for private wikis)
         """
         self.base_url = base_url.rstrip('/')
@@ -31,12 +31,18 @@ class WikiJSCrawler:
     def test_connection(self) -> bool:
         """Test if Wiki.js is accessible"""
         try:
-            response = requests.get(f"{self.base_url}/health", headers=self.headers, timeout=10)
-            return response.status_code == 200
+            # Try the main page first (most reliable)
+            response = requests.get(f"{self.base_url}/", headers=self.headers, timeout=10)
+            if response.status_code == 200:
+                # Check if it's actually Wiki.js by looking for Wiki.js indicators
+                content = response.text.lower()
+                if 'wiki.js' in content or 'wikijs' in content:
+                    return True
+            return False
         except:
             # Try alternative health check endpoints
             try:
-                response = requests.get(f"{self.base_url}/", headers=self.headers, timeout=10)
+                response = requests.get(f"{self.base_url}/health", headers=self.headers, timeout=10)
                 return response.status_code == 200
             except:
                 return False
@@ -178,7 +184,7 @@ class WikiJSCrawler:
             return []
     
     def _discover_pages_from_root(self) -> List[Dict[str, Any]]:
-        """Discover pages by crawling from the root URL"""
+        """Discover pages by crawling from the root URL and using common patterns"""
         try:
             discovered_urls = set()
             pages = []
@@ -187,23 +193,80 @@ class WikiJSCrawler:
             root_page = self._fetch_page_content(self.base_url)
             if root_page:
                 pages.append(root_page)
-                
-                # Look for internal links in the root page
-                soup = BeautifulSoup(root_page.get('raw_content', ''), 'html.parser')
-                
-                for link in soup.find_all('a', href=True):
-                    href = link.get('href')
-                    if href and not href.startswith(('http', '#', 'mailto:', 'javascript:')):
-                        full_url = urljoin(self.base_url, href)
-                        
-                        # Only process internal URLs
-                        if urlparse(full_url).netloc == urlparse(self.base_url).netloc:
-                            if full_url not in discovered_urls and len(discovered_urls) < 50:  # Limit crawling
-                                discovered_urls.add(full_url)
-                                page_info = self._fetch_page_content(full_url)
-                                if page_info:
-                                    pages.append(page_info)
+                discovered_urls.add(self.base_url)
             
+            # Common Wiki.js page patterns to try
+            common_patterns = [
+                # Common Wiki.js paths
+                '/en/auth',
+                '/en/auth/auth0', 
+                '/en/auth/azure',
+                '/en/install',
+                '/en/install/linux',
+                '/en/install/macos',
+                '/en/install/ubuntu',
+                '/en/install/docker',
+                '/en/install/requirements',
+                '/en/install/digitalocean',
+                '/en/install/docker-desktop',
+                '/en/JBoss',
+                'en/JBoss/'
+                # Alternative patterns
+                '/auth',
+                '/auth/auth0',
+                '/auth/azure', 
+                '/install',
+                '/install/linux',
+                '/install/macos',
+                '/install/ubuntu',
+                '/install/docker',
+                '/install/requirements',
+                '/install/digitalocean',
+                '/install/docker-desktop',
+                # Other common paths
+                '/getting-started',
+                '/configuration',
+                '/api',
+                '/admin',
+                '/help',
+                '/docs',
+                '/guide'
+            ]
+            
+            # Try each pattern
+            for pattern in common_patterns:
+                full_url = urljoin(self.base_url, pattern)
+                if full_url not in discovered_urls:
+                    discovered_urls.add(full_url)
+                    page_info = self._fetch_page_content(full_url)
+                    if page_info:
+                        pages.append(page_info)
+                        query_logger.logger.info(f"Discovered page: {pattern}")
+            
+            # Also try to find links in existing pages
+            for page in pages[:]:  # Use slice to avoid modifying while iterating
+                if page.get('raw_content'):
+                    soup = BeautifulSoup(page.get('raw_content', ''), 'html.parser')
+                    
+                    for link in soup.find_all('a', href=True):
+                        href = link.get('href')
+                        if href and not href.startswith(('http', '#', 'mailto:', 'javascript:')):
+                            # Handle Wiki.js internal links
+                            if href.startswith('/'):
+                                full_url = urljoin(self.base_url, href)
+                            else:
+                                full_url = urljoin(page.get('url', self.base_url), href)
+                            
+                            # Only process internal URLs
+                            if urlparse(full_url).netloc == urlparse(self.base_url).netloc:
+                                if full_url not in discovered_urls and len(discovered_urls) < 100:  # Increased limit
+                                    discovered_urls.add(full_url)
+                                    page_info = self._fetch_page_content(full_url)
+                                    if page_info:
+                                        pages.append(page_info)
+                                        query_logger.logger.info(f"Discovered linked page: {href}")
+            
+            query_logger.logger.info(f"Total pages discovered: {len(pages)}")
             return pages
             
         except Exception as e:
@@ -232,14 +295,17 @@ class WikiJSCrawler:
                 for element in soup.find_all(class_=re.compile(class_name)):
                     element.decompose()
             
-            # Extract main content
+            # Extract main content - try multiple selectors for Wiki.js
             content_selectors = [
                 '.wiki-page-content',
                 '.page-content', 
                 'main',
                 '.content',
                 'article',
-                '.markdown-body'
+                '.markdown-body',
+                '[slot="contents"]',  # Wiki.js specific
+                '.page-contents',
+                '#root'  # Fallback to root element
             ]
             
             content_elem = None
@@ -254,7 +320,7 @@ class WikiJSCrawler:
             # Clean up the content
             clean_content = self._clean_html_content(content_elem.get_text())
             
-            if not clean_content or len(clean_content.strip()) < 50:
+            if not clean_content or len(clean_content.strip()) < 20:
                 return None
             
             # Extract path from URL
@@ -314,10 +380,17 @@ class WikiJSCrawler:
             # Try API first (more reliable)
             pages = self.get_all_pages_via_api()
             
-            # Fallback to scraping if API fails
+            # Fallback to scraping if API fails or returns no pages
             if not pages:
-                query_logger.logger.info("API failed, falling back to web scraping")
+                query_logger.logger.info("API failed or returned no pages, falling back to web scraping")
                 pages = self.get_all_pages_via_scraping()
+            
+            # If still no pages, try to get at least the home page
+            if not pages:
+                query_logger.logger.info("No pages found via scraping, trying to fetch home page")
+                home_page = self._fetch_page_content(self.base_url)
+                if home_page:
+                    pages = [home_page]
             
             # Convert to standard document format
             documents = []
@@ -334,7 +407,7 @@ class WikiJSCrawler:
                 }
                 
                 # Only include pages with meaningful content
-                if doc['content'] and len(doc['content'].strip()) > 100:
+                if doc['content'] and len(doc['content'].strip()) > 50:  # Reduced threshold
                     documents.append(doc)
             
             query_logger.logger.info(f"Successfully retrieved {len(documents)} Wiki.js pages")

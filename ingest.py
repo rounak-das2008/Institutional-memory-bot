@@ -32,7 +32,7 @@ def main():
         # Auto-detect source type
         if source_type == 'auto':
             wiki_url = args.wiki_url or WIKI_BASE_URL
-            if wiki_url and wiki_url != 'http://localhost:3000':
+            if wiki_url and wiki_url != 'http://localhost':
                 source_type = 'wiki'
             elif DATA_DIR.exists() and any(DATA_DIR.iterdir()):
                 source_type = 'local'

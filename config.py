@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from dotenv import load_dotenv
+load_dotenv()
 
 # Paths
 DATA_DIR = Path("data")
@@ -28,7 +30,7 @@ EMBEDDING_MODEL = "gemini-2.5-flash"
 GENERATION_MODEL = "gemini-2.5-flash"
 
 # Wiki.js Integration Configuration
-WIKI_BASE_URL = os.getenv("WIKI_BASE_URL", "http://localhost:3000")
+WIKI_BASE_URL = os.getenv("WIKI_BASE_URL", "http://localhost")
 WIKI_API_KEY = os.getenv("WIKI_API_KEY", "")
 WIKI_REFRESH_INTERVAL = int(os.getenv("WIKI_REFRESH_INTERVAL", "1800"))  # seconds
 

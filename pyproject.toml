@@ -14,4 +14,5 @@ dependencies = [
     "sift-stack-py>=0.8.5",
     "streamlit>=1.49.1",
     "trafilatura>=2.0.0",
+    "typing-extensions>=4.15.0",
 ]

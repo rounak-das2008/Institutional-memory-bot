@@ -227,7 +227,7 @@ def display_configuration_panel():
     wiki_url = st.text_input(
         "Wiki.js Base URL",
         value=WIKI_BASE_URL,
-        help="Wiki.js instance URL (e.g., http://localhost:3000)",
+        help="Wiki.js instance URL (e.g., http://localhost)",
         key="wiki_url_input"
     )
     
